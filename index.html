@@ -4,9 +4,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Local Data Node</title>
+  <meta name="theme-color" content="#0f1115">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script>
+    // Встроенный однофайловый манифест для установки PWA без лишних файлов в репозитории
+    (function() {
+      const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#16181d"/><rect x="32" y="32" width="448" height="448" rx="88" fill="none" stroke="#3b82f6" stroke-width="20"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="180" fill="#e2e8f0">{}</text></svg>`;
+      const iconUrl = 'data:image/svg+xml;base64,' + btoa(iconSvg);
+      const manifest = {
+        name: 'Local Data Node',
+        short_name: 'DataNode',
+        start_url: window.location.href.split('#')[0],
+        scope: window.location.pathname,
+        display: 'standalone',
+        background_color: '#0f1115',
+        theme_color: '#0f1115',
+        icons: [{ src: iconUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+      const link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = URL.createObjectURL(blob);
+      document.head.appendChild(link);
+    })();
+  </script>
   <style>
     :root {
       --bg: #0f1115;
@@ -297,6 +320,7 @@
       padding: 8px 0;
       border-bottom: 1px solid var(--border);
       font-size: 14px;
+      gap: 12px;
     }
 
     .kv-row:last-child {
@@ -306,6 +330,7 @@
 
     .kv-key {
       color: var(--text-muted);
+      flex-shrink: 0;
     }
 
     .kv-val {
@@ -453,10 +478,10 @@
 
       <input type="file" id="file-input" accept=".json,application/json" style="display: none;">
       <button class="shell-btn primary" onclick="document.getElementById('file-input').click()">Load JSON Config</button>
-      <button class="shell-btn" onclick="toggleKeyArea()">Paste Key String</button>
+      <button class="shell-btn" onclick="toggleKeyArea()">Paste Key / JSON</button>
 
       <div id="key-area" class="shell-input-area">
-        <textarea id="key-input" placeholder="Paste base64 payload..."></textarea>
+        <textarea id="key-input" placeholder="Paste JSON or base64 payload..."></textarea>
         <button class="shell-btn primary" onclick="loadFromBase64()">Mount Payload</button>
       </div>
     </div>
@@ -534,6 +559,10 @@
     function loadFromBase64() {
       const raw = document.getElementById('key-input').value.trim();
       if (!raw) return;
+      if (raw.startsWith('{')) {
+        mountRawJson(raw);
+        return;
+      }
       try {
         const decoded = decodeURIComponent(escape(atob(raw)));
         mountRawJson(decoded);
