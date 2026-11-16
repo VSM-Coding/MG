@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Local Data Node</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --surface: #181b20;
+      --surface-alt: #22262e;
+      --text: #e2e8f0;
+      --text-muted: #8b949e;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59, 130, 246, 0.15);
+      --border: #2d333b;
+      --pos-bg: rgba(16, 185, 129, 0.15);
+      --pos-text: #34d399;
+      --neg-bg: rgba(239, 68, 68, 0.15);
+      --neg-text: #f87171;
+      --warn-bg: rgba(245, 158, 11, 0.15);
+      --warn-text: #fbbf24;
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* --- СТЕРИЛЬНЫЙ ЭКРАН ЗАГРУЗКИ (SHELL) --- */
+    #shell-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .shell-box {
+      width: 100%;
+      max-width: 400px;
+      background: #16181d;
+      border: 1px solid #262930;
+      border-radius: 12px;
+      padding: 28px 24px;
+      text-align: center;
+    }
+
+    .shell-icon {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto 16px;
+      border: 1.5px solid #3f4451;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      font-family: monospace;
+      font-size: 18px;
+    }
+
+    .shell-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #d1d5db;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .shell-sub {
+      font-size: 13px;
+      color: #6b7280;
+      margin-bottom: 24px;
+    }
+
+    .shell-btn {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border: 1px solid #2e323b;
+      background: #1f2229;
+      color: #e5e7eb;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: background 0.15s;
+    }
+
+    .shell-btn:active {
+      background: #2a2e37;
+    }
+
+    .shell-btn.primary {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #fff;
+    }
+
+    .shell-input-area {
+      display: none;
+      margin-top: 12px;
+    }
+
+    .shell-input-area textarea {
+      width: 100%;
+      height: 90px;
+      background: #0d0e11;
+      border: 1px solid #2e323b;
+      border-radius: 8px;
+      color: #d1d5db;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      resize: none;
+      margin-bottom: 10px;
+    }
+
+    /* --- ГИДРАТИРОВАННОЕ ПРИЛОЖЕНИЕ (WORKSPACE) --- */
+    #app-view {
+      display: none;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px 16px 90px;
+    }
+
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .app-title-group h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .app-title-group p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .icon-btn.danger {
+      color: var(--neg-text);
+    }
+
+    /* Поиск */
+    .search-bar {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 15px;
+      margin-bottom: 18px;
+      outline: none;
+    }
+
+    .search-bar:focus {
+      border-color: var(--accent);
+    }
+
+    /* Секции и карточки */
+    .block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .block-title {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Даты */
+    .date-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--surface-alt);
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+
+    .date-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .date-item.soon {
+      border: 1px solid var(--warn-text);
+      background: var(--warn-bg);
+    }
+
+    .date-label {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .date-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .date-badge {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .date-item.soon .date-badge {
+      background: var(--warn-text);
+      color: #000;
+    }
+
+    /* Теги (Любит / Не любит) */
+    .tags-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      background: var(--surface-alt);
+      color: var(--text);
+    }
+
+    .tag.pos {
+      background: var(--pos-bg);
+      color: var(--pos-text);
+    }
+
+    .tag.neg {
+      background: var(--neg-bg);
+      color: var(--neg-text);
+    }
+
+    /* Параметры (Ключ-значение) */
+    .kv-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+
+    .kv-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .kv-key {
+      color: var(--text-muted);
+    }
+
+    .kv-val {
+      font-weight: 600;
+      text-align: right;
+    }
+
+    /* Списки и заметки */
+    .note-item {
+      padding: 10px 12px;
+      background: var(--surface-alt);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .note-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .note-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .del-note {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
+    /* Нижняя панель */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .bottom-bar button {
+      flex: 1;
+      max-width: 190px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .bottom-bar button.accent {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Модальное окно */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 50;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .modal-card h3 {
+      margin-bottom: 12px;
+      font-size: 16px;
+    }
+
+    .modal-card input, .modal-card textarea {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .toast {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- НЕЙТРАЛЬНАЯ ЗАГЛУШКА -->
+  <div id="shell-view">
+    <div class="shell-box">
+      <div class="shell-icon">{}</div>
+      <div class="shell-title">LOCAL DATA NODE</div>
+      <div class="shell-sub">No active configuration loaded in memory</div>
+
+      <input type="file" id="file-input" accept=".json,application/json" style="display: none;">
+      <button class="shell-btn primary" onclick="document.getElementById('file-input').click()">Load JSON Config</button>
+      <button class="shell-btn" onclick="toggleKeyArea()">Paste Key String</button>
+
+      <div id="key-area" class="shell-input-area">
+        <textarea id="key-input" placeholder="Paste base64 payload..."></textarea>
+        <button class="shell-btn primary" onclick="loadFromBase64()">Mount Payload</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ГИДРАТИРОВАННЫЙ ИНТЕРФЕЙС -->
+  <div id="app-view">
+    <header class="app-header">
+      <div class="app-title-group">
+        <h1 id="ui-title">Workspace</h1>
+        <p id="ui-subtitle"></p>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn danger" onclick="clearState()" title="Wipe memory">Lock</button>
+      </div>
+    </header>
+
+    <input type="text" id="search-input" class="search-bar" placeholder="Поиск по записям..." oninput="renderDynamicBlocks()">
+
+    <div id="dynamic-container"></div>
+
+    <div class="bottom-bar">
+      <button class="accent" onclick="openNoteModal()">+ Заметка</button>
+      <button onclick="copyBackupKey()">Копировать ключ</button>
+      <button onclick="downloadJsonFile()">Скачать JSON</button>
+    </div>
+  </div>
+
+  <!-- МОДАЛКА БЫСТРОЙ ЗАМЕТКИ -->
+  <div id="note-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <h3>Новая запись</h3>
+      <input type="text" id="new-note-text" placeholder="Суть (например: хочет книгу...)">
+      <input type="text" id="new-note-meta" placeholder="Контекст или тег (необязательно)">
+      <div class="modal-actions">
+        <button class="icon-btn" onclick="closeNoteModal()">Отмена</button>
+        <button class="icon-btn" style="background: var(--accent); color: #fff; border: none;" onclick="saveQuickNote()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'node_payload_v1';
+    let state = null;
+
+    // Инициализация при запуске
+    window.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          state = JSON.parse(saved);
+          hydrateApp();
+        } catch (e) {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+    });
+
+    // Загрузка через файл
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        mountRawJson(ev.target.result);
+      };
+      reader.readAsText(file);
+    });
+
+    function toggleKeyArea() {
+      const el = document.getElementById('key-area');
+      el.style.display = el.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function loadFromBase64() {
+      const raw = document.getElementById('key-input').value.trim();
+      if (!raw) return;
+      try {
+        const decoded = decodeURIComponent(escape(atob(raw)));
+        mountRawJson(decoded);
+      } catch (e) {
+        showToast('Invalid key format');
+      }
+    }
+
+    function mountRawJson(jsonStr) {
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (!parsed || typeof parsed !== 'object') throw new Error();
+        state = parsed;
+        if (!Array.isArray(state.quickNotes)) state.quickNotes = [];
+        persistState();
+        hydrateApp();
+      } catch (e) {
+        showToast('Corrupted configuration data');
+      }
+    }
+
+    function persistState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function clearState() {
+      localStorage.removeItem(STORAGE_KEY);
+      state = null;
+      document.title = 'Local Data Node';
+      document.getElementById('app-view').style.display = 'none';
+      document.getElementById('shell-view').style.display = 'flex';
+      document.getElementById('file-input').value = '';
+      document.getElementById('key-input').value = '';
+      resetTheme();
+    }
+
+    function resetTheme() {
+      const root = document.documentElement.style;
+      root.removeProperty('--bg');
+      root.removeProperty('--surface');
+      root.removeProperty('--surface-alt');
+      root.removeProperty('--text');
+      root.removeProperty('--text-muted');
+      root.removeProperty('--accent');
+      root.removeProperty('--accent-soft');
+      root.removeProperty('--border');
+    }
+
+    // Применение дизайна и данных из JSON
+    function hydrateApp() {
+      const meta = state.meta || {};
+      const theme = state.theme || {};
+
+      // Переопределение заголовков
+      document.title = meta.pageTitle || meta.title || 'Workspace';
+      document.getElementById('ui-title').textContent = meta.title || 'Workspace';
+      document.getElementById('ui-subtitle').textContent = meta.subtitle || '';
+
+      // Переопределение цветов (дизайна)
+      const root = document.documentElement.style;
+      if (theme.bg) root.setProperty('--bg', theme.bg);
+      if (theme.surface) root.setProperty('--surface', theme.surface);
+      if (theme.surfaceAlt) root.setProperty('--surface-alt', theme.surfaceAlt);
+      if (theme.text) root.setProperty('--text', theme.text);
+      if (theme.textMuted) root.setProperty('--text-muted', theme.textMuted);
+      if (theme.accent) {
+        root.setProperty('--accent', theme.accent);
+        root.setProperty('--accent-soft', theme.accent + '26');
+      }
+      if (theme.border) root.setProperty('--border', theme.border);
+
+      document.getElementById('shell-view').style.display = 'none';
+      document.getElementById('app-view').style.display = 'block';
+
+      renderDynamicBlocks();
+    }
+
+    function calcDaysLeft(dateStr, recurring = true) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const parts = dateStr.split('-').map(Number);
+      if (parts.length < 3) return null;
+
+      let target = new Date(parts[0], parts[1] - 1, parts[2]);
+      if (recurring) {
+        target.setFullYear(now.getFullYear());
+        if (target < now) {
+          target.setFullYear(now.getFullYear() + 1);
+        }
+      }
+      const diff = Math.round((target - now) / (1000 * 60 * 60 * 24));
+      return diff;
+    }
+
+    function renderDynamicBlocks() {
+      const container = document.getElementById('dynamic-container');
+      const query = document.getElementById('search-input').value.trim().toLowerCase();
+      container.innerHTML = '';
+
+      // 1. Блок дат
+      if (Array.isArray(state.dates) && state.dates.length > 0) {
+        const enriched = state.dates
+          .map(d => ({ ...d, daysLeft: calcDaysLeft(d.date, d.recurring !== false) }))
+          .filter(d => !query || d.label.toLowerCase().includes(query) || (d.note && d.note.toLowerCase().includes(query)))
+          .sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
+
+        if (enriched.length > 0) {
+          const block = document.createElement('div');
+          block.className = 'block';
+          block.innerHTML = `<div class="block-title"><span>Даты и события</span></div>`;
+
+          enriched.forEach(item => {
+            const isSoon = item.daysLeft !== null && item.daysLeft >= 0 && item.daysLeft <= 14;
+            let badgeText = item.date;
+            if (item.daysLeft === 0) badgeText = 'Сегодня!';
+            else if (item.daysLeft === 1) badgeText = 'Завтра';
+            else if (item.daysLeft > 1) badgeText = `Через ${item.daysLeft} дн.`;
+
+            const row = document.createElement('div');
+            row.className = `date-item ${isSoon ? 'soon' : ''}`;
+            row.innerHTML = `
+              <div>
+                <div class="date-label">${escapeHtml(item.label)}</div>
+                <div class="date-sub">${escapeHtml(item.date)}${item.note ? ' • ' + escapeHtml(item.note) : ''}</div>
+              </div>
+              <div class="date-badge">${badgeText}</div>
+            `;
+            block.appendChild(row);
+          });
+          container.appendChild(block);
+        }
+      }
+
+      // 2. Универсальные секции из JSON
+      if (Array.isArray(state.sections)) {
+        state.sections.forEach(sec => {
+          const block = document.createElement('div');
+          block.className = 'block';
+          let hasContent = false;
+
+          const titleEl = document.createElement('div');
+          titleEl.className = 'block-title';
+          titleEl.innerHTML = `<span>${escapeHtml(sec.title || 'Раздел')}</span>`;
+          block.appendChild(titleEl);
+
+          // Тип: теги (положительные / отрицательные / нейтральные)
+          if (sec.type === 'tags' && Array.isArray(sec.items)) {
+            const filtered = sec.items.filter(t => {
+              const text = typeof t === 'string' ? t : t.text;
+              return !query || text.toLowerCase().includes(query);
+            });
+            if (filtered.length > 0) {
+              hasContent = true;
+              const wrap = document.createElement('div');
+              wrap.className = 'tags-wrap';
+              filtered.forEach(t => {
+                const text = typeof t === 'string' ? t : t.text;
+                const tone = typeof t === 'object' ? t.tone : (sec.tone || '');
+                const span = document.createElement('span');
+                span.className = `tag ${tone}`;
+                span.textContent = text;
+                wrap.appendChild(span);
+              });
+              block.appendChild(wrap);
+            }
+          }
+
+          // Тип: параметры (ключ - значение)
+          if (sec.type === 'kv' && Array.isArray(sec.items)) {
+            const filtered = sec.items.filter(kv =>
+              !query || kv.k.toLowerCase().includes(query) || kv.v.toLowerCase().includes(query)
+            );
+            if (filtered.length > 0) {
+              hasContent = true;
+              filtered.forEach(kv => {
+                const row = document.createElement('div');
+                row.className = 'kv-row';
+                row.innerHTML = `<span class="kv-key">${escapeHtml(kv.k)}</span><span class="kv-val">${escapeHtml(kv.v)}</span>`;
+                block.appendChild(row);
+              });
+            }
+          }
+
+          // Тип: список (вишлист, идеи подарков, фильмы, места)
+          if (sec.type === 'list' && Array.isArray(sec.items)) {
+            const filtered = sec.items.filter(it => {
+              const title = typeof it === 'string' ? it : it.title;
+              const note = typeof it === 'object' ? (it.note || '') : '';
+              return !query || title.toLowerCase().includes(query) || note.toLowerCase().includes(query);
+            });
+            if (filtered.length > 0) {
+              hasContent = true;
+              filtered.forEach(it => {
+                const title = typeof it === 'string' ? it : it.title;
+                const note = typeof it === 'object' ? it.note : '';
+                const row = document.createElement('div');
+                row.className = 'note-item';
+                row.innerHTML = `
+                  <div>
+                    <div style="font-weight: 500;">${escapeHtml(title)}</div>
+                    ${note ? `<div class="note-meta">${escapeHtml(note)}</div>` : ''}
+                  </div>
+                `;
+                block.appendChild(row);
+              });
+            }
+          }
+
+          if (hasContent) {
+            container.appendChild(block);
+          }
+        });
+      }
+
+      // 3. Быстрые заметки, добавленные прямо с телефона
+      if (Array.isArray(state.quickNotes) && state.quickNotes.length > 0) {
+        const filtered = state.quickNotes
+          .map((n, idx) => ({ ...n, idx }))
+          .filter(n => !query || n.text.toLowerCase().includes(query) || (n.meta && n.meta.toLowerCase().includes(query)));
+
+        if (filtered.length > 0) {
+          const block = document.createElement('div');
+          block.className = 'block';
+          block.innerHTML = `<div class="block-title"><span>Быстрые заметки</span></div>`;
+
+          filtered.forEach(n => {
+            const row = document.createElement('div');
+            row.className = 'note-item';
+            row.innerHTML = `
+              <div>
+                <div>${escapeHtml(n.text)}</div>
+                <div class="note-meta">${escapeHtml(n.date || '')}${n.meta ? ' • ' + escapeHtml(n.meta) : ''}</div>
+              </div>
+              <button class="del-note" onclick="deleteQuickNote(${n.idx})">×</button>
+            `;
+            block.appendChild(row);
+          });
+          container.appendChild(block);
+        }
+      }
+    }
+
+    // Быстрые заметки
+    function openNoteModal() {
+      document.getElementById('note-modal').style.display = 'flex';
+      document.getElementById('new-note-text').focus();
+    }
+
+    function closeNoteModal() {
+      document.getElementById('note-modal').style.display = 'none';
+      document.getElementById('new-note-text').value = '';
+      document.getElementById('new-note-meta').value = '';
+    }
+
+    function saveQuickNote() {
+      const text = document.getElementById('new-note-text').value.trim();
+      const meta = document.getElementById('new-note-meta').value.trim();
+      if (!text) return;
+
+      const today = new Date().toISOString().split('T')[0];
+      state.quickNotes.unshift({ text, meta, date: today });
+      persistState();
+      closeNoteModal();
+      renderDynamicBlocks();
+      showToast('Запись сохранена');
+    }
+
+    function deleteQuickNote(idx) {
+      state.quickNotes.splice(idx, 1);
+      persistState();
+      renderDynamicBlocks();
+    }
+
+    // Экспорт и бэкап
+    function copyBackupKey() {
+      const jsonStr = JSON.stringify(state);
+      const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+      navigator.clipboard.writeText(b64).then(() => {
+        showToast('Base64-ключ скопирован');
+      });
+    }
+
+    function downloadJsonFile() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+      const a = document.createElement('a');
+      a.setAttribute("href", dataStr);
+      a.setAttribute("download", "config_data.json");
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.opacity = '1';
+      setTimeout(() => { t.style.opacity = '0'; }, 2200);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+  </script>
+</body>
+</html>
